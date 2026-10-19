@@ -1,0 +1,18 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Local User"
+            }
+        ],
+        "Category": "Status & System",
+        "Description": "Displays active notification app icons in the panel",
+        "Icon": "preferences-desktop-notification",
+        "Id": "org.kde.notificationicons",
+        "Name": "Notification App Icons",
+        "Version": "1.0"
+    },
+    "KPackageStructure": "Plasma/Applet",
+    "X-Plasma-API": "declarativeappletscript",
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
