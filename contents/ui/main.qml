@@ -230,20 +230,25 @@ PlasmoidItem {
                         anchors.bottom: parent.bottom
                         anchors.rightMargin: -3
                         anchors.bottomMargin: -2
-                        width: Math.max(badgeLabel.implicitWidth + 6, 14)
-                        height: 14
-                        radius: 7
-                        color: Kirigami.Theme.highlightColor
+                        width: Math.max(badgeLabel.implicitWidth + 8, 18)
+                        height: 18
+                        radius: 9
+                        color: Qt.rgba(
+                            Kirigami.Theme.backgroundColor.r,
+                            Kirigami.Theme.backgroundColor.g,
+                            Kirigami.Theme.backgroundColor.b,
+                            0.60
+                        )
                         border.width: 1
-                        border.color: Kirigami.Theme.backgroundColor
+                        border.color: Kirigami.Theme.highlightColor
 
                         PlasmaComponents.Label {
                             id: badgeLabel
                             anchors.centerIn: parent
                             text: parent.parent.badgeCount > 9 ? "9+" : parent.parent.badgeCount
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             font.bold: true
-                            color: Kirigami.Theme.highlightedTextColor
+                            color: Kirigami.Theme.textColor
                         }
                     }
 
