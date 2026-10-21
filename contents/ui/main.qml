@@ -10,6 +10,14 @@ import org.kde.notificationmanager as NotificationManager
 PlasmoidItem {
     id: root
     preferredRepresentation: compactRepresentation
+    property date currentTime: new Date()
+    property string hoveredAppName: ""
+    property int hoveredAppNotificationCount: 0
+
+    toolTipMainText: hoveredAppName
+    toolTipSubText: hoveredAppName
+        ? i18np("%1 notification", "%1 notifications", hoveredAppNotificationCount)
+        : ""
 
     NotificationManager.Settings {
         id: notifSettings
@@ -37,25 +45,39 @@ PlasmoidItem {
         onTriggered: root.syncUniqueApps()
     }
 
+    Timer {
+        interval: 60000
+        repeat: true
+        running: true
+        onTriggered: root.currentTime = new Date()
+    }
+
     ListModel {
         id: uniqueAppsModel
     }
 
-    function formatRelativeTime(dateVal) {
+    function formatRelativeTime(dateVal, now) {
         if (!dateVal) return "";
-        let now = new Date();
         let diffSec = Math.floor((now.getTime() - dateVal.getTime()) / 1000);
-        if (isNaN(diffSec) || diffSec < 60) return "Just now";
+        if (isNaN(diffSec) || diffSec < 60) return i18n("Just now");
         let diffMin = Math.floor(diffSec / 60);
-        if (diffMin < 60) return diffMin + " min ago";
+        if (diffMin < 60) return i18np("%1 minute ago", "%1 minutes ago", diffMin);
         let diffHr = Math.floor(diffMin / 60);
-        if (diffHr < 24) return diffHr + " hr ago";
-        return Qt.formatDateTime(dateVal, "dd MMM, hh:mm");
+        if (diffHr < 24) return i18np("%1 hour ago", "%1 hours ago", diffHr);
+        return Qt.formatDateTime(dateVal, i18n("dd MMM, hh:mm"));
+    }
+
+    function notificationGroupKey(desktopEntry, appName, iconName) {
+        return desktopEntry || appName || iconName || "";
+    }
+
+    function notificationIconSource(applicationIconName, desktopEntry, iconName) {
+        return applicationIconName || desktopEntry || iconName || "preferences-desktop-notification";
     }
 
     function syncUniqueApps() {
         uniqueAppsModel.clear();
-        let groups = {};
+        let groups = Object.create(null);
         let order = [];
 
         for (let i = 0; i < notifModel.count; i++) {
@@ -67,18 +89,19 @@ PlasmoidItem {
                 continue;
             }
 
-            let appName = notifModel.data(idx, NotificationManager.Notifications.AppNameRole) || "";
+            let appName = notifModel.data(idx, NotificationManager.Notifications.ApplicationNameRole) || "";
             let desktopEntry = notifModel.data(idx, NotificationManager.Notifications.DesktopEntryRole) || "";
+            let applicationIconName = notifModel.data(idx, NotificationManager.Notifications.ApplicationIconNameRole) || "";
             let iconName = notifModel.data(idx, NotificationManager.Notifications.IconNameRole) || "";
             let summary = notifModel.data(idx, NotificationManager.Notifications.SummaryRole) || "";
 
-            let key = desktopEntry || appName || iconName || ("unknown_" + i);
-            let resolvedIcon = iconName || desktopEntry || "preferences-desktop-notification";
+            let key = root.notificationGroupKey(desktopEntry, appName, applicationIconName || iconName);
+            let resolvedIcon = root.notificationIconSource(applicationIconName, desktopEntry, iconName);
 
             if (!groups[key]) {
                 groups[key] = {
                     groupKey: key,
-                    appName: appName || desktopEntry || "Notification",
+                    appName: appName || desktopEntry || i18n("Notification"),
                     iconSource: resolvedIcon,
                     summary: summary,
                     badgeCount: 1
@@ -106,10 +129,11 @@ PlasmoidItem {
     function clearAppGroup(targetKey) {
         for (let i = notifModel.count - 1; i >= 0; i--) {
             let idx = notifModel.index(i, 0);
-            let appName = notifModel.data(idx, NotificationManager.Notifications.AppNameRole) || "";
+            let appName = notifModel.data(idx, NotificationManager.Notifications.ApplicationNameRole) || "";
             let desktopEntry = notifModel.data(idx, NotificationManager.Notifications.DesktopEntryRole) || "";
+            let applicationIconName = notifModel.data(idx, NotificationManager.Notifications.ApplicationIconNameRole) || "";
             let iconName = notifModel.data(idx, NotificationManager.Notifications.IconNameRole) || "";
-            let key = desktopEntry || appName || iconName || ("unknown_" + i);
+            let key = root.notificationGroupKey(desktopEntry, appName, applicationIconName || iconName);
 
             if (key === targetKey) {
                 notifModel.close(idx);
@@ -164,7 +188,7 @@ PlasmoidItem {
 
             Kirigami.Icon {
                 visible: uniqueAppsModel.count === 0
-                source: "preferences-desktop-notification-bell-symbolic"
+                source: Plasmoid.configuration.idleIcon || "preferences-desktop-notification-bell-symbolic"
                 opacity: compactRoot.containsMouse ? 0.9 : 0.55
                 Layout.preferredWidth: 20
                 Layout.preferredHeight: 20
@@ -223,14 +247,19 @@ PlasmoidItem {
                         }
                     }
 
-                    // Tooltip completely disabled
-                    QQC2.ToolTip.visible: false
-
                     MouseArea {
                         id: iconMouse
                         anchors.fill: parent
                         hoverEnabled: true
                         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                        onEntered: {
+                            root.hoveredAppName = appName;
+                            root.hoveredAppNotificationCount = badgeCount;
+                        }
+                        onExited: {
+                            root.hoveredAppName = "";
+                            root.hoveredAppNotificationCount = 0;
+                        }
                         onClicked: (mouse) => {
                             if (mouse.button === Qt.MiddleButton) {
                                 root.clearAppGroup(groupKey);
@@ -271,7 +300,7 @@ PlasmoidItem {
 
                     Kirigami.Heading {
                         level: 3
-                        text: "Notifications"
+                        text: i18n("Notifications")
                         Layout.fillWidth: true
                     }
 
@@ -279,7 +308,7 @@ PlasmoidItem {
                         icon.name: "edit-clear-history"
                         visible: notifModel.count > 0
                         onClicked: root.clearAllNotifications()
-                        QQC2.ToolTip.text: "Clear all notifications"
+                        QQC2.ToolTip.text: i18n("Clear all notifications")
                         QQC2.ToolTip.visible: hovered
                     }
 
@@ -288,7 +317,7 @@ PlasmoidItem {
                         onClicked: {
                             Qt.openUrlExternally("systemsettings://kcm_notifications");
                         }
-                        QQC2.ToolTip.text: "Notification Settings"
+                        QQC2.ToolTip.text: i18n("Notification Settings")
                         QQC2.ToolTip.visible: hovered
                     }
                 }
@@ -297,7 +326,7 @@ PlasmoidItem {
                     Layout.fillWidth: true
                     PlasmaComponents.Switch {
                         id: dndSwitch
-                        text: "Do not disturb"
+                        text: i18n("Do not disturb")
                         checked: {
                             let now = new Date();
                             return (notifSettings.notificationsInhibitedUntil && notifSettings.notificationsInhibitedUntil > now)
@@ -324,7 +353,7 @@ PlasmoidItem {
                 width: parent.width - (Kirigami.Units.largeSpacing * 4)
                 visible: notifModel.count === 0
                 iconName: dndSwitch.checked ? "notifications-disabled" : "preferences-desktop-notification-bell"
-                text: dndSwitch.checked ? "Do Not Disturb is enabled" : "No unread notifications"
+                text: dndSwitch.checked ? i18n("Do Not Disturb is enabled") : i18n("No notifications")
             }
 
             PlasmaComponents.ScrollView {
@@ -380,7 +409,7 @@ PlasmoidItem {
                                     spacing: Kirigami.Units.smallSpacing * 1.5
 
                                     Kirigami.Icon {
-                                        source: model.iconName || model.desktopEntry || "preferences-desktop-notification"
+                                        source: root.notificationIconSource(model.applicationIconName, model.desktopEntry, model.iconName)
                                         Layout.preferredWidth: 18
                                         Layout.preferredHeight: 18
                                         Layout.alignment: Qt.AlignVCenter
@@ -388,7 +417,7 @@ PlasmoidItem {
 
                                     PlasmaComponents.Label {
                                         text: {
-                                            let app = model.appName || "System";
+                                            let app = model.applicationName || i18n("System");
                                             let origin = model.originName || "";
                                             return origin ? (app + " · " + origin) : app;
                                         }
@@ -398,7 +427,7 @@ PlasmoidItem {
                                     }
 
                                     PlasmaComponents.Label {
-                                        text: root.formatRelativeTime(model.updated || model.created)
+                                        text: root.formatRelativeTime(model.updated || model.created, root.currentTime)
                                         opacity: 0.6
                                     }
 
@@ -408,7 +437,7 @@ PlasmoidItem {
                                         Layout.preferredWidth: 22
                                         Layout.preferredHeight: 22
                                         onClicked: notifModel.configure(notifModel.index(index, 0))
-                                        QQC2.ToolTip.text: "Configure Notification..."
+                                        QQC2.ToolTip.text: i18n("Configure Notification...")
                                         QQC2.ToolTip.visible: hovered
                                     }
 
@@ -417,7 +446,7 @@ PlasmoidItem {
                                         Layout.preferredWidth: 22
                                         Layout.preferredHeight: 22
                                         onClicked: root.closeSingleNotification(index)
-                                        QQC2.ToolTip.text: "Close"
+                                        QQC2.ToolTip.text: i18n("Close")
                                         QQC2.ToolTip.visible: hovered
                                     }
                                 }
@@ -490,14 +519,14 @@ PlasmoidItem {
                                     PlasmaComponents.TextField {
                                         id: replyField
                                         Layout.fillWidth: true
-                                        placeholderText: model.replyPlaceholderText || "Type a reply..."
+                                        placeholderText: model.replyPlaceholderText || i18n("Type a reply...")
                                         onAccepted: replyBtn.clicked()
                                     }
 
                                     PlasmaComponents.Button {
                                         id: replyBtn
                                         icon.name: model.replySubmitButtonIconName || "document-send"
-                                        text: model.replySubmitButtonText || "Send"
+                                        text: model.replySubmitButtonText || i18n("Send")
                                         enabled: replyField.text.length > 0
                                         onClicked: {
                                             notifModel.reply(

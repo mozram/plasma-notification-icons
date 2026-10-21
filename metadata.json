@@ -6,7 +6,7 @@
             }
         ],
         "Category": "Status & System",
-        "Description": "Displays active notification app icons in the panel",
+        "Description": "Displays grouped notification app icons in the panel",
         "Icon": "preferences-desktop-notification",
         "Id": "org.kde.notificationicons",
         "Name": "Notification App Icons",
